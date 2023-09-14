@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+    <http:listener-config name="sys-sfdc-account-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="sys-sfdc-account-config" api="sys-sfdc-account.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <configuration-properties doc:name="Configuration properties" doc:id="45f69936-81fe-4cd7-900b-9f08ca264875" file="config.yaml" />
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="2426f7dd-13e3-4542-93e7-146ba5dc3506" >
+		<salesforce:basic-connection username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.securityToken}" />
+	</salesforce:sfdc-config>
+	<flow name="sys-sfdc-account-main">
+        <http:listener config-ref="sys-sfdc-account-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="sys-sfdc-account-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="sys-sfdc-account-console">
+        <http:listener config-ref="sys-sfdc-account-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="sys-sfdc-account-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="put:\customers\(customerId):application\json:sys-sfdc-account-config">
+        <ee:transform doc:name="set customerId var">
+            <ee:variables>
+                <ee:set-variable variableName="customerId">attributes.uriParams.'customerId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <ee:transform doc:name="save Payload" doc:id="ed382a45-ac0b-4ab4-81a5-d80a2e6c00de" >
+			<ee:variables >
+				<ee:set-variable variableName="wkPayload" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference(existence check)" doc:id="b0a5db73-a4bb-4564-8762-0ec802c876e9" name="existence-check" />
+		<ee:transform doc:name="Set Input Params" doc:id="5d6533c0-e5cd-4a7f-a1c2-718429472e4f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Id: vars.customerId,
+	Name: vars.wkPayload.name,
+	BillingStreet: vars.wkPayload.billingAddress.streetAddress,
+	BillingCity: vars.wkPayload.billingAddress.city default "",
+	BillingState: vars.wkPayload.billingAddress.state,
+	BillingCountry: vars.wkPayload.billingAddress.country,
+	BillingPostalCode: vars.wkPayload.billingAddress.zipCode,
+	ShippingStreet: vars.wkPayload.shippingAddress.streetAddress,
+	ShippingCity: vars.wkPayload.shippingAddress.city,
+	ShippingState: vars.wkPayload.shippingAddress.state,
+	ShippingCountry: vars.wkPayload.shippingAddress.country,
+	ShippingPostalCode: vars.wkPayload.shippingAddress.zipCode,
+	Phone: vars.wkPayload.phone,
+	Account_Email__c: vars.wkPayload.email
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:update type="Account" doc:name="Update" doc:id="a13fec82-df1b-4aee-ad3e-a22498397cee" config-ref="Salesforce_Config"/>
+		<ee:transform doc:name="set Response" doc:id="a34f82d2-ba7b-4eab-910d-2d2cccd09b09" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	affectedId: vars.customerId,
+	processSts: if (payload.items[0].successful) ("succeeded") else ("failed")
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="delete:\customers\(customerId):sys-sfdc-account-config">
+        <ee:transform doc:name="set customerId var">
+            <ee:variables>
+                <ee:set-variable variableName="customerId">attributes.uriParams.'customerId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+		<flow-ref doc:name="Flow Reference(existence check)" doc:id="ff6173b9-c165-4220-88bb-8e7c7252472b" name="existence-check" />
+		<salesforce:delete doc:name="Delete" doc:id="ae76c1eb-80cf-47c0-8f50-69177554e4db" config-ref="Salesforce_Config">
+			<salesforce:ids ><![CDATA[#[[vars.customerId]]]]></salesforce:ids>
+		</salesforce:delete>
+		<ee:transform doc:name="set Response" doc:id="90e75147-7152-48d3-adaf-efbd6e25fb19" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	affectedId: vars.customerId,
+	processSts: if (payload.items[0].successful) ("succeeded") else ("failed")
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="get:\customers:sys-sfdc-account-config">
+        <choice doc:name="Request Contains Name" doc:id="15971f4f-aef6-40f3-a78e-eca9fc8662c1">
+            <when expression="#[attributes.queryParams.name != null]">
+				<set-variable value="#['%' ++ attributes.queryParams.name as String default '' ++ '%']" doc:name="Set wkName" doc:id="4ebcd60d-917b-45a4-b1ea-a35717c99039" doc:description="検索対象の Account 名(URI Parameter に指定)を wildcard で囲い wkName 変数へ格納" variableName="wkName" />
+				<salesforce:query doc:name="Query by name" doc:id="6a35bcd5-4a53-4f94-b1f4-ac6e70ddd79b" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query ><![CDATA[SELECT Id, Account_Email__c, Name, Phone, ShippingStreet, ShippingCity, ShippingCountry, ShippingState, ShippingPostalCode, BillingStreet, BillingCity, BillingCountry, BillingState, BillingPostalCode FROM Account  
+WHERE Name LIKE ':wkName']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"wkName" : vars.wkName
+}]]]></salesforce:parameters>
+				</salesforce:query>
+				<try doc:name="Try" doc:id="624641aa-6700-4e67-adc1-a55e75acafb1" >
+					<validation:is-not-empty-collection doc:name="Is not empty collection" doc:id="316bf1aa-3dab-4fc4-b1bb-ccff7cbef09b" />
+					<error-handler >
+						<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="08bc518c-429c-4d49-9e07-a8f30939f503" >
+							<set-variable value="400" doc:name="Set httpStatus" doc:id="e43ad310-d63a-4e48-b4d7-773762d25f81" doc:description="set httpStatus to make the request an error" variableName="httpStatus" />
+							<ee:transform doc:name="Set Error Message" doc:id="51fc6f47-efd1-4b87-9cb0-4f5fb2706973" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg: "Customers were not found."
+}]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+						</on-error-propagate>
+					</error-handler>
+				</try>
+            </when>
+			<otherwise>
+				<salesforce:query doc:name="Query fisrt 100 records" doc:id="407bf00b-ccab-456e-8650-d1244fe7cfc5" config-ref="Salesforce_Config" >
+					<salesforce:salesforce-query ><![CDATA[SELECT Id, Account_Email__c, Name, Phone, ShippingStreet, ShippingCity, ShippingCountry, ShippingState, ShippingPostalCode, BillingStreet, BillingCity, BillingCountry, BillingState, BillingPostalCode FROM Account  
+WHERE IsDeleted=false LIMIT :wkLimit]]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"wkLimit" : 100
+}]]]></salesforce:parameters>
+				</salesforce:query>
+            </otherwise>
+        </choice>
+        <ee:transform xsi:schemaLocation=" http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" doc:name="SFDC Accounts to JSon" doc:id="53bf1132-4414-45ac-ac1d-48f7cdad4d87">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	id: payload01.Id default "",
+	customerData: {
+		name: payload01.Name,
+		phone: payload01.Phone,
+		email: payload01.Account_Email__c,
+		billingAddress: {
+			country: payload01.BillingCountry,
+			state: payload01.BillingState,
+			city: payload01.BillingCity,
+			streetAddress: payload01.BillingStreet,
+			zipCode: payload01.BillingPostalCode
+		},
+		shippingAddress: {
+			country: payload01.ShippingCountry,
+			state: payload01.ShippingState,
+			city: payload01.ShippingCity,
+			streetAddress: payload01.ShippingStreet,
+			zipCode: payload01.ShippingPostalCode
+		}
+		
+	}
+	
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\customers\(customerId):sys-sfdc-account-config">
+        <ee:transform doc:name="set customerId var">
+            <ee:variables>
+                <ee:set-variable variableName="customerId">attributes.uriParams.'customerId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+		<flow-ref doc:name="Flow Reference(existence check)" doc:id="8e3515fa-3993-47a0-85d5-541e850d1172" name="existence-check"/>
+		<salesforce:query doc:name="Query the record associated with Id" doc:id="9ae2d1a2-c0fc-4b19-87ed-2dd57fa43580" config-ref="Salesforce_Config" >
+			<salesforce:salesforce-query ><![CDATA[SELECT Id, Account_Email__c, Name, Phone, ShippingStreet, ShippingCity, ShippingCountry, ShippingState, ShippingPostalCode, BillingStreet, BillingCity, BillingCountry, BillingState, BillingPostalCode FROM Account  
+WHERE Id = ':wkId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"wkId" : vars.customerId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="SFDC Accounts to JSon" doc:id="0afa0883-1d91-49d4-b7d2-e318ab4ab266" xsi:schemaLocation=" http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	id: payload[0].Id default "",
+	profile: {
+		phone: payload[0].Phone,
+		name: payload[0].Name,
+		email: payload[0].Account_Email__c,
+		billingAddress: {
+			country: payload[0].BillingCountry,
+			state: payload[0].BillingState,
+			city: payload[0].BillingCity,
+			streetAddress: payload[0].BillingStreet,
+			zipCode: payload[0].BillingPostalCode
+		},
+		shippingAddress: {
+			country: payload[0].ShippingCountry,
+			state: payload[0].ShippingState,
+			city: payload[0].ShippingCity,
+			streetAddress: payload[0].ShippingStreet,
+			zipCode: payload[0].ShippingPostalCode
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="post:\customers:application\json:sys-sfdc-account-config">
+        <ee:transform doc:name="Set Input Params for SFDC" doc:id="c2aca690-851b-4fdd-a7eb-d7816ba44b59" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Name: payload.name,
+	BillingStreet: payload.billingAddress.streetAddress,
+	BillingCity: payload.billingAddress.city default "",
+	BillingState: payload.billingAddress.state,
+	BillingCountry: payload.billingAddress.country,
+	BillingPostalCode: payload.billingAddress.zipCode,
+	ShippingStreet: payload.shippingAddress.streetAddress,
+	ShippingCity: payload.shippingAddress.city,
+	ShippingState: payload.shippingAddress.state,
+	ShippingCountry: payload.shippingAddress.country,
+	ShippingPostalCode: payload.shippingAddress.zipCode,
+	Phone: payload.phone,
+	Account_Email__c: payload.email
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create type="Account" doc:name="Create" doc:id="c93bde5e-f3bd-4d33-8d36-8fd10a0c8d14" config-ref="Salesforce_Config"/>
+		<ee:transform doc:name="set Response" doc:id="6627dcac-edcd-4341-aa9d-89b19b162e20" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	affectedId: payload.items[0].payload.id,
+	processSts: if (payload.items[0].successful) ("succeeded") else ("failed")
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    
+    <flow name="existence-check" doc:id="d40fc24f-21c9-4b16-9778-8c020ef3cf63" >
+<salesforce:query doc:name="Query by Id" doc:id="9ea0afbb-9516-49b3-a281-68a2d0cc0d69" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query ><![CDATA[SELECT Id FROM Account 
+WHERE Id = ':wkId']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"wkId" : vars.customerId
+}]]]></salesforce:parameters>
+				</salesforce:query>
+				<try doc:name="Try" doc:id="2cca4a66-ddd3-441a-ad4d-a8a4321507d3" >
+					<validation:is-not-empty-collection doc:name="Is not empty collection" doc:id="a639f3a7-2888-4120-b30d-06a5309f5b61" />
+			<error-handler >
+						<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="29574560-40be-4e7a-a06a-1067958fb061" >
+							<set-variable value="400" doc:name="Set httpStatus" doc:id="c9bcef3d-0623-46de-802f-1372a67912b5" doc:description="set httpStatus to make the request an error" variableName="httpStatus" />
+							<ee:transform doc:name="Set Error Message" doc:id="1a340831-716b-40ab-8024-faaf3bf433c1" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg: "Customers were not found."
+}]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+						</on-error-propagate>
+					</error-handler>
+				</try>
+	</flow>
+</mule>
